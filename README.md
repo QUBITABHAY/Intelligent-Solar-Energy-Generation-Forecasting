@@ -165,6 +165,14 @@ The generated report includes:
 * **Solar Energy Power Generation Dataset**
 * Source: Kaggle
 * Link: [https://www.kaggle.com/datasets/stucom/solar-energy-power-generation-dataset](https://www.kaggle.com/datasets/stucom/solar-energy-power-generation-dataset)
+* File: `data/spg.csv`
+* Records: 4,213 entries
+* Features: 21 columns including:
+  * Weather indicators: temperature, humidity, pressure, precipitation, cloud cover
+  * Solar radiation: shortwave radiation backwards surface
+  * Wind data: speed and direction at multiple altitudes (10m, 80m, 900mb)
+  * Solar geometry: angle of incidence, zenith, azimuth
+  * Target variable: `generated_power_kw`
 
 ---
 
@@ -189,38 +197,6 @@ The generated report includes:
 
 ---
 
-## 📁 Repository Structure
-
-```
-Intelligent-Solar-Energy-Generation-Forecasting/
-├── data/
-│   └── solar_generation.csv
-├── notebooks/
-│   ├── eda.ipynb
-│   └── experiments.ipynb
-├── src/
-│   ├── preprocessing.py
-│   ├── feature_engineering.py
-│   ├── train_model.py
-│   ├── forecast.py
-│   ├── evaluate.py
-│   └── agents/
-│       ├── forecast_agent.py
-│       ├── risk_agent.py
-│       ├── retrieval_agent.py
-│       ├── optimization_agent.py
-│       └── agent_graph.py
-├── ui/
-│   └── app.py
-├── vectorstore/
-│   └── energy_docs/
-├── models/
-├── requirements.txt
-├── README.md
-└── .gitignore
-```
-
----
 
 ## ⚙️ Project Setup Guide
 
@@ -228,7 +204,7 @@ Intelligent-Solar-Energy-Generation-Forecasting/
 
 ```bash
 git clone https://github.com/Yashsingh045/Intelligent-Solar-Energy-Generation-Forecasting.git
-
+cd Intelligent-Solar-Energy-Generation-Forecasting
 ```
 
 ### 2️⃣ Create Virtual Environment
@@ -236,7 +212,7 @@ git clone https://github.com/Yashsingh045/Intelligent-Solar-Energy-Generation-Fo
 ```bash
 python -m venv venv
 source venv/bin/activate  # Linux / Mac
-venv\\Scripts\\activate     # Windows
+venv\Scripts\activate     # Windows
 ```
 
 ### 3️⃣ Install Dependencies
@@ -245,13 +221,59 @@ venv\\Scripts\\activate     # Windows
 pip install -r requirements.txt
 ```
 
+**Key Dependencies:**
+* `streamlit` - Web application framework
+* `pandas` - Data manipulation and analysis
+* `matplotlib` - Data visualization
+* `numpy` - Numerical computing
+* `seaborn` - Statistical data visualization
+* `scikit-learn` - Machine learning library
+* `jupyter` - Interactive notebook environment
+
 ### 4️⃣ Run the Application (Local)
 
 ```bash
-streamlit run ui/app.py
+streamlit run app.py
 ```
 
+The application will open in your browser at `http://localhost:8501`
 
+### 5️⃣ Explore the Data (Optional)
+
+```bash
+jupyter notebook notebooks/data.ipynb
+```
+
+This notebook contains exploratory data analysis including:
+* Data quality checks
+* Correlation analysis
+* Feature visualization
+* Statistical summaries
+
+---
+
+## 🎮 How to Use the Application
+
+1. **Launch the App**
+   ```bash
+   streamlit run app.py
+   ```
+
+2. **Upload Dataset**
+   * Click "Browse files" or drag and drop your CSV file
+   * Maximum file size: 10MB
+   * Supported format: CSV with UTF-8 encoding
+
+3. **Explore Your Data**
+   * View dataset preview (first 20 rows)
+   * Check dataset shape and column names
+   * Select any numeric column from the dropdown
+   * View interactive line plots
+
+4. **Analyze Patterns**
+   * Use the notebook for deeper analysis
+   * Examine correlations between features
+   * Identify key predictors of power generation
 
 ---
 
@@ -262,7 +284,6 @@ The application is deployed using **Hugging Face Spaces (Streamlit)**:
 * Free-tier hosting
 * Publicly accessible URL
 * Automatic build from repository
-
 
 ---
 
