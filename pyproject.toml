@@ -8,7 +8,7 @@ dependencies = [
 	"joblib",
 	"matplotlib",
 	"numpy",
-	"pandas",
+	"pandas",`
 	"scikit-learn",
 	"streamlit",
 ]
