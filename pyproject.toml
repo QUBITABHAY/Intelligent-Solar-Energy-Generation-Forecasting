@@ -1,0 +1,17 @@
+[project]
+name = "intelligent-solar-energy-generation-forecasting"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+	"joblib",
+	"matplotlib",
+	"numpy",
+	"pandas",
+	"scikit-learn",
+	"streamlit",
+]
+
+[tool.uv]
+package = false
