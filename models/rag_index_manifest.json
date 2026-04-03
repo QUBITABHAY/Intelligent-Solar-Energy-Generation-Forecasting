@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "embedding_model": "all-MiniLM-L6-v2",
+  "chunks_path": "rag_chunks.json",
+  "embeddings_path": "rag_embeddings.npy",
+  "chunks_sha256": "6ff091245f6531f6fbfdc34e57a01c61fa9e7d8efc523d8f3536e7cc950a819f",
+  "embeddings_sha256": "bde823abb6fcbf16ad6269e9541e56ef1ac579d87be99a1dc9fe318520222d2a",
+  "num_chunks": 5,
+  "embeddings_shape": [
+    5,
+    384
+  ],
+  "embeddings_dtype": "float32"
+}
