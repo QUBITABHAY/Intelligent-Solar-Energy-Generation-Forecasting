@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy as np
 
 
 def analyze_forecast(df) -> dict:
@@ -55,6 +54,7 @@ def identify_risks(df, threshold=500) -> list[dict]:
     Identifies risk periods where predicted power generation falls below threshold.
     
     A risk period is a contiguous sequence of time steps where power < threshold.
+    NaN values are excluded from risk detection.
     
     Args:
         df: DataFrame containing a 'Predicted Power (kW)' column
@@ -62,23 +62,25 @@ def identify_risks(df, threshold=500) -> list[dict]:
     
     Returns:
         list of dicts, each representing a risk period:
-        - 'start_index': first index of low-power period
-        - 'end_index': last index of low-power period
+        - 'start_index': first index label of low-power period
+        - 'end_index': last index label of low-power period  
         - 'avg_power': average power during this period (kW)
-        - 'risk_level': 'HIGH' if avg < 200, 'MEDIUM' if avg < 500
+        - 'risk_level': 'HIGH' if avg < 200, 'MEDIUM' if 200 <= avg < 500, 'LOW' if avg >= 500
     """
     if 'Predicted Power (kW)' not in df.columns:
         raise ValueError("DataFrame must contain 'Predicted Power (kW)' column")
     
-    power_col = df['Predicted Power (kW)'].fillna(0)
+    # Drop NaN values for consistent risk detection (excludes missing data, doesn't artificially fill)
+    power_col = df['Predicted Power (kW)'].dropna()
     
     # Create boolean mask for below-threshold periods
     below_threshold = power_col < threshold
     
-    # Find contiguous regions
+    # Find contiguous regions, tracking both current and previous index
     risks = []
     in_risk_period = False
     start_idx = None
+    prev_idx = None
     
     for idx, is_risky in below_threshold.items():
         if is_risky and not in_risk_period:
@@ -86,8 +88,9 @@ def identify_risks(df, threshold=500) -> list[dict]:
             start_idx = idx
             in_risk_period = True
         elif not is_risky and in_risk_period:
-            # End of risk period
-            risk_data = power_col[start_idx:idx]
+            # End of risk period: use prev_idx (last risky index, not current non-risky)
+            # Use .loc for label-based slicing to work with any index type (DatetimeIndex, RangeIndex, etc.)
+            risk_data = power_col.loc[start_idx:prev_idx]
             avg_power = float(risk_data.mean())
             
             # Determine risk level per specification
@@ -100,15 +103,19 @@ def identify_risks(df, threshold=500) -> list[dict]:
             
             risks.append({
                 'start_index': start_idx,
-                'end_index': idx,
+                'end_index': prev_idx,
                 'avg_power': avg_power,
                 'risk_level': risk_level
             })
             in_risk_period = False
+        
+        if is_risky:
+            prev_idx = idx
     
     # Handle case where risk period extends to end of dataframe
     if in_risk_period:
-        risk_data = power_col[start_idx:]
+        # Use .loc for label-based slicing (works with any index type)
+        risk_data = power_col.loc[start_idx:prev_idx]
         avg_power = float(risk_data.mean())
         
         if avg_power < 200:
@@ -120,7 +127,7 @@ def identify_risks(df, threshold=500) -> list[dict]:
         
         risks.append({
             'start_index': start_idx,
-            'end_index': len(df) - 1,
+            'end_index': prev_idx,
             'avg_power': avg_power,
             'risk_level': risk_level
         })
@@ -147,8 +154,8 @@ def retrieve_guidelines(query: str) -> str:
     """
     try:
         from src.rag import get_retriever
-    except ImportError:
-        raise ImportError("RAG module not available. Ensure src/rag.py exists.")
+    except ImportError as exc:
+        raise ImportError("RAG module not available. Ensure src/rag.py exists and sentence-transformers is installed.") from exc
     
     # Get the retriever singleton
     retriever = get_retriever()
