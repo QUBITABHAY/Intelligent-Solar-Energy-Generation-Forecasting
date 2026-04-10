@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import joblib
 import os
 from sklearn.metrics import mean_absolute_error, r2_score
+from src.feature_aligner import align_features
 
 st.set_page_config(page_title="Solar Energy Forecasting", layout="wide")
 
@@ -31,6 +32,39 @@ st.write("Upload the dataset and visualize solar power generation trends.")
 if model is None:
     st.error("Model artifacts not found. Please run the training script first.")
     st.stop()
+
+# --- Quick Forecast Sidebar ---
+st.sidebar.header("⚡ Quick Forecast")
+with st.sidebar.form("quick_forecast_form"):
+    temp = st.slider("Temperature (°C)", min_value=-10.0, max_value=45.0, value=15.0)
+    humidity = st.slider("Humidity (%)", min_value=0.0, max_value=100.0, value=51.0)
+    cloud_cover = st.slider("Cloud Cover (%)", min_value=0.0, max_value=100.0, value=34.0)
+    irradiance = st.slider("Solar Irradiance (W/m²)", min_value=0.0, max_value=1200.0, value=388.0)
+    wind_speed = st.slider("Wind Speed (km/h)", min_value=0.0, max_value=50.0, value=16.0)
+    zenith = st.slider("Zenith Angle (°)", min_value=0.0, max_value=90.0, value=60.0)
+    
+    predict_button = st.form_submit_button("Predict")
+
+if predict_button:
+    input_data = pd.DataFrame([{
+        'temp': temp,
+        'humidity': humidity,
+        'cloud_cover': cloud_cover,
+        'irradiance': irradiance,
+        'wind_speed': wind_speed,
+        'zenith': zenith
+    }])
+    
+    try:
+        aligned_features = align_features(input_data)
+        scaled_features = scaler.transform(aligned_features)
+        prediction = model.predict(scaled_features)[0]
+        st.sidebar.success(f"Predicted Power: **{prediction:.2f} kW**")
+    except Exception as e:
+        st.sidebar.error("An error occurred during prediction.")
+        with st.sidebar.expander("Error Details"):
+            st.exception(e)
+# ------------------------------
 
 uploaded_file = st.file_uploader("Upload your solar dataset (CSV)", type=["csv"])
 
