@@ -61,7 +61,9 @@ if predict_button:
         prediction = model.predict(scaled_features)[0]
         st.sidebar.success(f"Predicted Power: **{prediction:.2f} kW**")
     except Exception as e:
-        st.sidebar.error(f"Prediction error: {e}")
+        st.sidebar.error("An error occurred during prediction.")
+        with st.sidebar.expander("Error Details"):
+            st.exception(e)
 # ------------------------------
 
 uploaded_file = st.file_uploader("Upload your solar dataset (CSV)", type=["csv"])
