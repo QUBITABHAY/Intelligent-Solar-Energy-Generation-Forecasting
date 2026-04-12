@@ -124,7 +124,8 @@ with tab_forecast:
         st.session_state.forecast_df = df.copy()
         try:
             st.session_state.forecast_summary = analyze_forecast(df)
-        except:
+        except Exception as e:
+            st.warning(f"Unable to analyze forecast: {e}")
             st.session_state.forecast_summary = None
 
         if has_actual:
@@ -260,13 +261,15 @@ with tab_assistant:
                         # Get forecast summary
                         try:
                             forecast_summary = analyze_forecast(forecast_df)
-                        except:
+                        except Exception as e:
+                            st.warning(f"Unable to build forecast summary for the PDF: {str(e)}")
                             forecast_summary = {}
                         
                         # Get risks
                         try:
                             risks = identify_risks(forecast_df)
-                        except:
+                        except Exception as e:
+                            st.warning(f"Unable to identify risks for the PDF: {str(e)}")
                             risks = []
                         
                         # Get recommendation from agent
