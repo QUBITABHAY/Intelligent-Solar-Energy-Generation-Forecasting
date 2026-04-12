@@ -90,16 +90,14 @@ if uploaded_file is not None:
     # Check if target exists 
     has_actual = TARGET_COL in df.columns
     
-    
-    features = df.drop(TARGET_COL, axis=1) if has_actual else df.copy()
-    
-    # Ensure columns match scaler expectations (simple check)
+    # Use Feature Aligner to handle any CSV format (different names, missing columns)
     try:
-        scaled_features = scaler.transform(features)
+        aligned_features = align_features(df)
+        scaled_features = scaler.transform(aligned_features)
         predictions = model.predict(scaled_features)
         df['Predicted Power (kW)'] = predictions
     except Exception as e:
-        st.error(f"Error during prediction: {e}. Please ensure the columns match the training data.")
+        st.error(f"Error during prediction: {e}.")
         st.stop()
 
 
