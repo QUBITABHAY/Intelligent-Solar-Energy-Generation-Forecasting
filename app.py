@@ -6,6 +6,9 @@ import joblib
 import os
 from sklearn.metrics import mean_absolute_error, r2_score
 from src.feature_aligner import align_features
+from src.tools import analyze_forecast, identify_risks
+from src.agent import agent
+from src.report_gen import generate_report
 
 st.set_page_config(page_title="Solar Energy Forecasting", layout="wide")
 
@@ -28,6 +31,14 @@ model, scaler = load_artifacts()
 
 st.title("Solar Energy Generation Forecasting")
 st.write("Upload the dataset and visualize solar power generation trends.")
+
+# Initialize session state
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+if "forecast_df" not in st.session_state:
+    st.session_state.forecast_df = None
+if "forecast_summary" not in st.session_state:
+    st.session_state.forecast_summary = None
 
 if model is None:
     st.error("Model artifacts not found. Please run the training script first.")
@@ -66,89 +77,227 @@ if predict_button:
             st.exception(e)
 # ------------------------------
 
-uploaded_file = st.file_uploader("Upload your solar dataset (CSV)", type=["csv"])
+# Create main tabs
+tab_forecast, tab_assistant = st.tabs(["📈 Forecasting", "🤖 AI Assistant"])
 
-if uploaded_file is not None:
+with tab_forecast:
+    uploaded_file = st.file_uploader("Upload your solar dataset (CSV)", type=["csv"])
 
-    # File size validation
-    file_size_mb = uploaded_file.size / (1024 * 1024)
+    if uploaded_file is not None:
 
-    if file_size_mb > MAX_FILE_SIZE_MB:
-        st.error(f"File too large! Please upload a CSV smaller than {MAX_FILE_SIZE_MB} MB.")
-        st.stop()
+        # File size validation
+        file_size_mb = uploaded_file.size / (1024 * 1024)
 
-    # Safe CSV reading
-    try:
-        df = pd.read_csv(uploaded_file)
-    except Exception as e:
-        st.error(f"Error reading CSV: {e}")
-        st.stop()
+        if file_size_mb > MAX_FILE_SIZE_MB:
+            st.error(f"File too large! Please upload a CSV smaller than {MAX_FILE_SIZE_MB} MB.")
+            st.stop()
 
-    
-    st.subheader("Results")
-    
-    # Check if target exists (case-insensitive to handle variations)
-    actual_col = None
-    for col in df.columns:
-        if col.strip().lower().replace(' ', '_') == TARGET_COL:
-            actual_col = col
-            break
-    has_actual = actual_col is not None
-    
-    # Use Feature Aligner to handle any CSV format (different names, missing columns)
-    try:
-        aligned_features = align_features(df)
-        scaled_features = scaler.transform(aligned_features)
-        predictions = model.predict(scaled_features)
-        df['Predicted Power (kW)'] = predictions
-    except Exception as e:
-        st.error(f"Error during prediction: {e}.")
-        st.stop()
+        # Safe CSV reading
+        try:
+            df = pd.read_csv(uploaded_file)
+        except Exception as e:
+            st.error(f"Error reading CSV: {e}")
+            st.stop()
 
+        
+        st.subheader("Results")
+        
+        # Check if target exists (case-insensitive to handle variations)
+        actual_col = None
+        for col in df.columns:
+            if col.strip().lower().replace(' ', '_') == TARGET_COL:
+                actual_col = col
+                break
+        has_actual = actual_col is not None
+        
+        # Use Feature Aligner to handle any CSV format (different names, missing columns)
+        try:
+            aligned_features = align_features(df)
+            scaled_features = scaler.transform(aligned_features)
+            predictions = model.predict(scaled_features)
+            df['Predicted Power (kW)'] = predictions
+        except Exception as e:
+            st.error(f"Error during prediction: {e}.")
+            st.stop()
 
-    if has_actual:
-        mae = mean_absolute_error(df[actual_col], predictions)
-        r2 = r2_score(df[actual_col], predictions)
-        col1, col2 = st.columns(2)
-        col1.metric("Mean Absolute Error (MAE)", f"{mae:.2f}")
-        col2.metric("R² Score", f"{r2:.4f}")
+        # Store data in session state for AI Assistant
+        st.session_state.forecast_df = df.copy()
+        try:
+            st.session_state.forecast_summary = analyze_forecast(df)
+        except Exception as e:
+            st.warning(f"Unable to analyze forecast: {e}")
+            st.session_state.forecast_summary = None
 
-    # dataset preview with predictions
-    st.subheader("Dataset Preview (with Predictions)")
-    st.dataframe(df.head(20))
-
-    # visualizations
-    st.subheader("Result Visualization")
-    
-    tab1, tab2 = st.tabs(["Actual vs Predicted", "Forecast View"])
-    
-    with tab1:
         if has_actual:
+            mae = mean_absolute_error(df[actual_col], predictions)
+            r2 = r2_score(df[actual_col], predictions)
+            col1, col2 = st.columns(2)
+            col1.metric("Mean Absolute Error (MAE)", f"{mae:.2f}")
+            col2.metric("R² Score", f"{r2:.4f}")
+
+        # dataset preview with predictions
+        st.subheader("Dataset Preview (with Predictions)")
+        st.dataframe(df.head(20))
+
+        # visualizations
+        st.subheader("Result Visualization")
+        
+        tab1, tab2 = st.tabs(["Actual vs Predicted", "Forecast View"])
+        
+        with tab1:
+            if has_actual:
+                fig, ax = plt.subplots(figsize=(10, 5))
+                ax.plot(df.index[:100], df[actual_col].iloc[:100], label='Actual', color='blue', alpha=0.7)
+                ax.plot(df.index[:100], df['Predicted Power (kW)'].iloc[:100], label='Predicted', color='orange', linestyle='--', alpha=0.9)
+                ax.set_title("Actual vs Predicted Solar Power (First 100 samples)")
+                ax.set_xlabel("Time Index")
+                ax.set_ylabel("Power (kW)")
+                ax.legend()
+                st.pyplot(fig)
+            else:
+                st.info("Actual data column not found. Comparison plot unavailable.")
+
+        with tab2:
             fig, ax = plt.subplots(figsize=(10, 5))
-            ax.plot(df.index[:100], df[actual_col].iloc[:100], label='Actual', color='blue', alpha=0.7)
-            ax.plot(df.index[:100], df['Predicted Power (kW)'].iloc[:100], label='Predicted', color='orange', linestyle='--', alpha=0.9)
-            ax.set_title("Actual vs Predicted Solar Power (First 100 samples)")
+            ax.plot(df.index, df['Predicted Power (kW)'], label='Forecast', color='orange')
+            ax.set_title("Solar Power Generation Forecast Curve")
             ax.set_xlabel("Time Index")
-            ax.set_ylabel("Power (kW)")
+            ax.set_ylabel("Predicted Power (kW)")
             ax.legend()
             st.pyplot(fig)
+
+        # dataset Info
+        with st.expander("View Dataset Info"):
+            st.write("Shape:", df.shape)
+            st.write("Columns:", list(df.columns))
+            st.write(df.describe())
+
+    else:
+        st.info("Upload a CSV file to begin.")
+
+with tab_assistant:
+    st.subheader("🤖 AI Assistant — Grid Optimization")
+    
+    # Display chat history
+    for message in st.session_state.chat_history:
+        with st.chat_message(message["role"]):
+            st.write(message["content"])
+    
+    # Chat input
+    user_input = st.chat_input("Ask about solar generation, grid balancing, or energy optimization...")
+    
+    if user_input:
+        # Add user message to history
+        st.session_state.chat_history.append({"role": "user", "content": user_input})
+        with st.chat_message("user"):
+            st.write(user_input)
+        
+        # Generate response using agent
+        if st.session_state.forecast_df is not None:
+            with st.spinner("Analyzing forecast..."):
+                try:
+                    state = {
+                        "forecast_df": st.session_state.forecast_df,
+                        "user_query": user_input,
+                        "forecast_summary": {},
+                        "risks": [],
+                        "guidelines": "",
+                        "recommendation": ""
+                    }
+                    
+                    result = agent.invoke(state)
+                    assistant_response = result.get("recommendation", "Unable to generate recommendation.")
+                    
+                    st.session_state.chat_history.append({"role": "assistant", "content": assistant_response})
+                    with st.chat_message("assistant"):
+                        st.write(assistant_response)
+                    
+                    # Store summary for report generation
+                    st.session_state.forecast_summary = result.get("forecast_summary", st.session_state.forecast_summary)
+                except Exception as e:
+                    error_msg = f"Error generating response: {str(e)}"
+                    st.session_state.chat_history.append({"role": "assistant", "content": error_msg})
+                    with st.chat_message("assistant"):
+                        st.error(error_msg)
         else:
-            st.info("Actual data column not found. Comparison plot unavailable.")
-
-    with tab2:
-        fig, ax = plt.subplots(figsize=(10, 5))
-        ax.plot(df.index, df['Predicted Power (kW)'], label='Forecast', color='orange')
-        ax.set_title("Solar Power Generation Forecast Curve")
-        ax.set_xlabel("Time Index")
-        ax.set_ylabel("Predicted Power (kW)")
-        ax.legend()
-        st.pyplot(fig)
-
-    # dataset Info
-    with st.expander("View Dataset Info"):
-        st.write("Shape:", df.shape)
-        st.write("Columns:", list(df.columns))
-        st.write(df.describe())
-
-else:
-    st.info("Upload a CSV file to begin.")
+            st.warning("⚠️ Please upload and forecast data in the Forecasting tab first.")
+    
+    st.divider()
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("📊 Generate Grid Report"):
+            if st.session_state.forecast_df is not None:
+                with st.spinner("Generating comprehensive report..."):
+                    try:
+                        state = {
+                            "forecast_df": st.session_state.forecast_df,
+                            "user_query": "Generate a comprehensive grid optimization report",
+                            "forecast_summary": {},
+                            "risks": [],
+                            "guidelines": "",
+                            "recommendation": ""
+                        }
+                        
+                        result = agent.invoke(state)
+                        report_text = result.get("recommendation", "")
+                        
+                        st.success("✅ Report generated!")
+                        st.markdown(report_text)
+                    except Exception as e:
+                        st.error(f"Error generating report: {str(e)}")
+            else:
+                st.error("❌ No forecast data available. Upload data in the Forecasting tab first.")
+    
+    with col2:
+        if st.button("📥 Download PDF Report"):
+            if st.session_state.forecast_df is not None:
+                with st.spinner("Generating PDF..."):
+                    try:
+                        # Get forecast data
+                        forecast_df = st.session_state.forecast_df
+                        
+                        # Get forecast summary
+                        try:
+                            forecast_summary = analyze_forecast(forecast_df)
+                        except Exception as e:
+                            st.warning(f"Unable to build forecast summary for the PDF: {str(e)}")
+                            forecast_summary = {}
+                        
+                        # Get risks
+                        try:
+                            risks = identify_risks(forecast_df)
+                        except Exception as e:
+                            st.warning(f"Unable to identify risks for the PDF: {str(e)}")
+                            risks = []
+                        
+                        # Get recommendation from agent
+                        state = {
+                            "forecast_df": forecast_df,
+                            "user_query": "Generate a comprehensive grid optimization report",
+                            "forecast_summary": forecast_summary,
+                            "risks": risks,
+                            "guidelines": "",
+                            "recommendation": ""
+                        }
+                        result = agent.invoke(state)
+                        recommendation = result.get("recommendation", "")
+                        
+                        # Generate PDF
+                        pdf_bytes = generate_report(
+                            recommendation=recommendation,
+                            forecast_summary=forecast_summary,
+                            risks=risks
+                        )
+                        
+                        st.download_button(
+                            label="📥 Download PDF",
+                            data=pdf_bytes,
+                            file_name="solar_grid_optimization_report.pdf",
+                            mime="application/pdf"
+                        )
+                    except Exception as e:
+                        st.error(f"Error generating PDF: {str(e)}")
+            else:
+                st.error("❌ No forecast data available.")

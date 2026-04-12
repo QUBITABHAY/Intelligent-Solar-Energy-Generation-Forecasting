@@ -2,7 +2,6 @@ import os
 from typing import TypedDict
 import pandas as pd
 from langgraph.graph import StateGraph, END
-from groq import Groq
 
 from src.tools import analyze_forecast, identify_risks, retrieve_guidelines
 
@@ -31,8 +30,17 @@ def retrieve_node(state: AgentState) -> dict:
     return {"guidelines": guidelines}
 
 def recommend_node(state: AgentState) -> dict:
-    """Generate recommendations using Groq."""
-    client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+    """Generate recommendations using Groq API."""
+    try:
+        from groq import Groq
+    except ImportError:
+        return {"recommendation": "Error: groq not installed. Install with: pip install groq"}
+    
+    api_key = os.environ.get("GROQ_API_KEY")
+    if not api_key:
+        return {"recommendation": "Error: GROQ_API_KEY environment variable not set"}
+    
+    client = Groq(api_key=api_key)
     
     prompt = f"""
     Please generate a comprehensive grid management report based on the following context.
@@ -56,15 +64,18 @@ def recommend_node(state: AgentState) -> dict:
     - Supporting references
     """
     
-    response = client.chat.completions.create(
-        messages=[{"role": "user", "content": prompt}],
-        model="gpt-oss-120b"
-    )
-    
-    if not response.choices or not response.choices[0].message.content:
-        return {"recommendation": "Error: Please try again."}
-    
-    return {"recommendation": response.choices[0].message.content}
+    try:
+        response = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="llama2-70b-4096"
+        )
+        
+        if response.choices and response.choices[0].message.content:
+            return {"recommendation": response.choices[0].message.content}
+        return {"recommendation": "Error: No response from API"}
+    except Exception as e:
+        return {"recommendation": f"Error generating report: {str(e)}"}
+
 
 graph_builder = StateGraph(AgentState)
 
