@@ -61,6 +61,9 @@ def recommend_node(state: AgentState) -> dict:
         model="gpt-oss-120b"
     )
     
+    if not response.choices or not response.choices[0].message.content:
+        return {"recommendation": "Error: Please try again."}
+    
     return {"recommendation": response.choices[0].message.content}
 
 graph_builder = StateGraph(AgentState)
