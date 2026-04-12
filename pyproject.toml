@@ -12,6 +12,9 @@ dependencies = [
 	"scikit-learn",
 	"streamlit",
 	"sentence-transformers",
+	"langgraph>=1.1.6",
+	"langchain-core>=1.2.28",
+	"groq>=1.1.2",
 ]
 
 [tool.uv]
