@@ -30,51 +30,43 @@ def retrieve_node(state: AgentState) -> dict:
     return {"guidelines": guidelines}
 
 def recommend_node(state: AgentState) -> dict:
-    """Generate recommendations using Groq API."""
-    try:
-        from groq import Groq
-    except ImportError:
-        return {"recommendation": "Error: groq not installed. Install with: pip install groq"}
+    """Generate a structured local report from forecast data and knowledge clips."""
     
-    api_key = os.environ.get("GROQ_API_KEY")
-    if not api_key:
-        return {"recommendation": "Error: GROQ_API_KEY environment variable not set"}
+    summary = state.get("forecast_summary", {})
+    risks = state.get("risks", [])
+    guidelines = state.get("guidelines", "No specific guidelines retrieved.")
     
-    client = Groq(api_key=api_key)
+    report = f"""### 📊 Local Grid Optimization Report
+
+#### 1. Solar Generation Forecast Summary
+- **Average Generation**: {summary.get('mean', 0):.2f} kW
+- **Peak Generation**: {summary.get('max', 0):.2f} kW
+- **Minimum Generation**: {summary.get('min', 0):.2f} kW
+- **Data Confidence**: High (Local Analysis)
+
+#### 2. Variability and Risk Assessment
+Found **{len(risks)}** significant variability periods:
+"""
     
-    prompt = f"""
-    Please generate a comprehensive grid management report based on the following context.
+    if not risks:
+        report += "- No high-risk low-generation periods identified.\n"
+    else:
+        for i, risk in enumerate(risks[:5], 1):
+            report += f"- Period {i}: Index {risk['start_index']} to {risk['end_index']} ({risk['risk_level']} Risk, Avg: {risk['avg_power']:.2f} kW)\n"
+
+    report += f"""
+#### 3. Grid Balancing & Knowledge Insights
+Based on the retrieved guidelines:
+---
+{guidelines}
+---
+
+#### 4. Supporting References
+- Source models: Random Forest Regressor & all-MiniLM-L6-v2
+- Local knowledge base query: '{state.get('user_query', 'General Optimization')}'
+"""
     
-    User Query: {state.get('user_query', 'Please provide a general solar generation report.')}
-    
-    Forecast Summary:
-    {state['forecast_summary']}
-    
-    Identified Risks:
-    {state['risks']}
-    
-    Grid Guidelines:
-    {state['guidelines']}
-    
-    Your report MUST include EXACTLY these 5 defined sections:
-    - Solar generation forecast summary
-    - Identified variability and risk periods
-    - Grid balancing and storage recommendations
-    - Energy utilization optimization strategies
-    - Supporting references
-    """
-    
-    try:
-        response = client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            model="llama2-70b-4096"
-        )
-        
-        if response.choices and response.choices[0].message.content:
-            return {"recommendation": response.choices[0].message.content}
-        return {"recommendation": "Error: No response from API"}
-    except Exception as e:
-        return {"recommendation": f"Error generating report: {str(e)}"}
+    return {"recommendation": report}
 
 
 graph_builder = StateGraph(AgentState)

@@ -81,24 +81,25 @@ if predict_button:
         st.sidebar.error("An error occurred during prediction.")
         with st.sidebar.expander("Error Details"):
             st.exception(e)
-            st.sidebar.markdown("---")
-            st.sidebar.header("🤖 Grid Assistant")
-            st.sidebar.write("Search knowledge base for battery, grid, and solar insights.")
 
-            user_query = st.sidebar.text_input("Ask a question:", placeholder="e.g., How to optimize battery storage?")
+# --- Grid Assistant Sidebar ---
+st.sidebar.markdown("---")
+st.sidebar.header("🤖 Grid Assistant")
+st.sidebar.write("Search knowledge base for battery, grid, and solar insights.")
 
-            if user_query:
-                with st.sidebar:
-                    with st.spinner("Searching knowledge base..."):
-                        results = retriever.retrieve(user_query, k=3)
-                        
-                        if not results:
-                            st.warning("No relevant information found.")
-                        else:
-                            for res in results:
-                                with st.expander(f"📄 {res['source']} (Match: {res['similarity']:.2%})"):
-                                    st.markdown(res['text'])
+user_query = st.sidebar.text_input("Ask a question:", placeholder="e.g., How to optimize battery storage?")
 
+if user_query:
+    with st.sidebar:
+        with st.spinner("Searching knowledge base..."):
+            results = retriever.retrieve(user_query, k=3)
+            
+            if not results:
+                st.warning("No relevant information found.")
+            else:
+                for res in results:
+                    with st.expander(f"📄 {res['source']} (Match: {res['similarity']:.2%})"):
+                        st.markdown(res['text'])
 # Create main tabs
 tab_forecast, tab_assistant = st.tabs(["📈 Forecasting", "🤖 AI Assistant"])
 
@@ -198,7 +199,8 @@ with tab_forecast:
         st.info("Upload a CSV file to begin.")
 
 with tab_assistant:
-    st.subheader("🤖 AI Assistant — Grid Optimization")
+    st.subheader("🤖 Local Intelligence — Grid Optimization")
+    st.info("💡 **Local Mode**: This assistant uses your local `all-MiniLM-L6-v2` model for private data analysis.")
     
     # Display chat history
     for message in st.session_state.chat_history:
@@ -273,53 +275,42 @@ with tab_assistant:
                 st.error("❌ No forecast data available. Upload data in the Forecasting tab first.")
     
     with col2:
-        if st.button("📥 Download PDF Report"):
-            if st.session_state.forecast_df is not None:
-                with st.spinner("Generating PDF..."):
-                    try:
-                        # Get forecast data
-                        forecast_df = st.session_state.forecast_df
-                        
-                        # Get forecast summary
-                        try:
-                            forecast_summary = analyze_forecast(forecast_df)
-                        except Exception as e:
-                            st.warning(f"Unable to build forecast summary for the PDF: {str(e)}")
-                            forecast_summary = {}
-                        
-                        # Get risks
-                        try:
-                            risks = identify_risks(forecast_df)
-                        except Exception as e:
-                            st.warning(f"Unable to identify risks for the PDF: {str(e)}")
-                            risks = []
-                        
-                        # Get recommendation from agent
-                        state = {
-                            "forecast_df": forecast_df,
-                            "user_query": "Generate a comprehensive grid optimization report",
-                            "forecast_summary": forecast_summary,
-                            "risks": risks,
-                            "guidelines": "",
-                            "recommendation": ""
-                        }
-                        result = agent.invoke(state)
-                        recommendation = result.get("recommendation", "")
-                        
-                        # Generate PDF
-                        pdf_bytes = generate_report(
-                            recommendation=recommendation,
-                            forecast_summary=forecast_summary,
-                            risks=risks
-                        )
-                        
-                        st.download_button(
-                            label="📥 Download PDF",
-                            data=pdf_bytes,
-                            file_name="solar_grid_optimization_report.pdf",
-                            mime="application/pdf"
-                        )
-                    except Exception as e:
-                        st.error(f"Error generating PDF: {str(e)}")
-            else:
-                st.error("❌ No forecast data available.")
+        if st.session_state.forecast_df is not None:
+            try:
+                # Prepare data for the one-click download
+                forecast_df = st.session_state.forecast_df
+                
+                # We generate the report data for the download button. 
+                # Since we are in local mode, this is fast enough for direct use.
+                with st.spinner("Preparing download..."):
+                    forecast_summary = analyze_forecast(forecast_df)
+                    risks = identify_risks(forecast_df)
+                    
+                    state = {
+                        "forecast_df": forecast_df,
+                        "user_query": "Generate a comprehensive grid optimization report",
+                        "forecast_summary": forecast_summary,
+                        "risks": risks,
+                        "guidelines": "",
+                        "recommendation": ""
+                    }
+                    result = agent.invoke(state)
+                    recommendation = result.get("recommendation", "")
+                    
+                    pdf_bytes = generate_report(
+                        recommendation=recommendation,
+                        forecast_summary=forecast_summary,
+                        risks=risks
+                    )
+                
+                st.download_button(
+                    label="📥 Download PDF Report",
+                    data=pdf_bytes,
+                    file_name="solar_grid_optimization_report.pdf",
+                    mime="application/pdf",
+                    key="direct_pdf_download"
+                )
+            except Exception as e:
+                st.error(f"Error preparing PDF: {str(e)}")
+        else:
+            st.button("📥 Download PDF Report", disabled=True, help="Upload data first to enable download.")

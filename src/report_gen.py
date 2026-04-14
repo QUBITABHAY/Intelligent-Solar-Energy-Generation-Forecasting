@@ -19,8 +19,8 @@ class SolarReportPDF(FPDF):
     def header(self):
         self.set_font("Helvetica", "B", 10)
         self.set_text_color(100, 100, 100)
-        self.cell(0, 8, "Solar Grid Optimization Report", align="C")
-        self.ln(4)
+        self.cell(0, 8, "Solar Grid Optimization Report", align="C", new_x="LMARGIN", new_y="NEXT")
+        self.ln(1)
         self.set_draw_color(0, 120, 200)
         self.set_line_width(0.5)
         self.line(10, self.get_y(), 200, self.get_y())
