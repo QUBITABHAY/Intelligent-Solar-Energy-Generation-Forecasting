@@ -43,31 +43,35 @@ def recommend_node(state: AgentState) -> dict:
     client = Groq(api_key=api_key)
     
     prompt = f"""
-    Please generate a comprehensive grid management report based on the following context.
+    ROLE: You are an Intelligent Solar Energy Grid Optimization Assistant. Your expertise is STRICTLY limited to solar generation forecasting, grid management, battery storage, and energy optimization.
     
-    User Query: {state.get('user_query', 'Please provide a general solar generation report.')}
+    GUARDRAILS:
+    - ONLY answer questions related to solar energy, grid optimization, and the provided forecast data.
+    - If the USER QUERY is unrelated to your role (e.g., general programming, HTML, recipes, etc.), politely decline and explain that you are a specialized assistant for solar grid optimization.
     
-    Forecast Summary:
-    {state['forecast_summary']}
+    USER QUERY: {state.get('user_query', 'Please provide a general solar generation report.')}
     
-    Identified Risks:
-    {state['risks']}
+    CONTEXT DATA:
+    - Forecast Summary: {state['forecast_summary']}
+    - Identified Risks: {state['risks']}
+    - Grid Management Guidelines (RAG): {state['guidelines']}
     
-    Grid Guidelines:
-    {state['guidelines']}
-    
-    Your report MUST include EXACTLY these 5 defined sections:
-    - Solar generation forecast summary
-    - Identified variability and risk periods
-    - Grid balancing and storage recommendations
-    - Energy utilization optimization strategies
-    - Supporting references
+    INSTRUCTIONS:
+    1. Check if the user query is on-topic. If not, follow the GUARDRAILS.
+    2. If on-topic, directly answer the USER QUERY using the provided CONTEXT DATA.
+    3. If the user asks for a "report" or "comprehensive analysis", provide a structured response with these sections:
+       - Solar generation forecast summary
+       - Identified variability and risk periods
+       - Grid balancing and storage recommendations
+       - Energy utilization optimization strategies
+       - Supporting references
+    4. Ground all technical claims in the provided data.
     """
     
     try:
         response = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            model="llama2-70b-4096"
+            model="openai/gpt-oss-120b"
         )
         
         if response.choices and response.choices[0].message.content:

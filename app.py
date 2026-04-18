@@ -4,6 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import joblib
 import os
+from dotenv import load_dotenv
+load_dotenv()
 from sklearn.metrics import mean_absolute_error, r2_score
 from src.feature_aligner import align_features
 from src.tools import analyze_forecast, identify_risks
@@ -39,12 +41,15 @@ st.title("Solar Energy Generation Forecasting")
 st.write("Upload the dataset and visualize solar power generation trends.")
 
 # Initialize session state
+MAX_CHAT_HISTORY = 50  # Cap to prevent unbounded memory growth
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 if "forecast_df" not in st.session_state:
     st.session_state.forecast_df = None
 if "forecast_summary" not in st.session_state:
     st.session_state.forecast_summary = None
+if "last_report" not in st.session_state:
+    st.session_state.last_report = None
 
 if model is None:
     st.error("Model artifacts not found. Please run the training script first.")
@@ -200,52 +205,7 @@ with tab_forecast:
 with tab_assistant:
     st.subheader("🤖 AI Assistant — Grid Optimization")
     
-    # Display chat history
-    for message in st.session_state.chat_history:
-        with st.chat_message(message["role"]):
-            st.write(message["content"])
-    
-    # Chat input
-    user_input = st.chat_input("Ask about solar generation, grid balancing, or energy optimization...")
-    
-    if user_input:
-        # Add user message to history
-        st.session_state.chat_history.append({"role": "user", "content": user_input})
-        with st.chat_message("user"):
-            st.write(user_input)
-        
-        # Generate response using agent
-        if st.session_state.forecast_df is not None:
-            with st.spinner("Analyzing forecast..."):
-                try:
-                    state = {
-                        "forecast_df": st.session_state.forecast_df,
-                        "user_query": user_input,
-                        "forecast_summary": {},
-                        "risks": [],
-                        "guidelines": "",
-                        "recommendation": ""
-                    }
-                    
-                    result = agent.invoke(state)
-                    assistant_response = result.get("recommendation", "Unable to generate recommendation.")
-                    
-                    st.session_state.chat_history.append({"role": "assistant", "content": assistant_response})
-                    with st.chat_message("assistant"):
-                        st.write(assistant_response)
-                    
-                    # Store summary for report generation
-                    st.session_state.forecast_summary = result.get("forecast_summary", st.session_state.forecast_summary)
-                except Exception as e:
-                    error_msg = f"Error generating response: {str(e)}"
-                    st.session_state.chat_history.append({"role": "assistant", "content": error_msg})
-                    with st.chat_message("assistant"):
-                        st.error(error_msg)
-        else:
-            st.warning("⚠️ Please upload and forecast data in the Forecasting tab first.")
-    
-    st.divider()
-    
+    # --- Report buttons (fixed at top, before chat) ---
     col1, col2 = st.columns(2)
     
     with col1:
@@ -265,8 +225,8 @@ with tab_assistant:
                         result = agent.invoke(state)
                         report_text = result.get("recommendation", "")
                         
-                        st.success("✅ Report generated!")
-                        st.markdown(report_text)
+                        # Store report separately to avoid bloating chat_history
+                        st.session_state.last_report = report_text
                     except Exception as e:
                         st.error(f"Error generating report: {str(e)}")
             else:
@@ -323,3 +283,58 @@ with tab_assistant:
                         st.error(f"Error generating PDF: {str(e)}")
             else:
                 st.error("❌ No forecast data available.")
+    
+    # --- Show last generated report in a collapsible section ---
+    if st.session_state.last_report:
+        with st.expander("📋 Last Generated Report", expanded=False):
+            st.markdown(st.session_state.last_report)
+    
+    st.divider()
+    
+    # --- Chat area (container keeps messages in a stable block) ---
+    chat_container = st.container()
+    
+    with chat_container:
+        for message in st.session_state.chat_history:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+    
+    # Chat input (always pinned at bottom by Streamlit)
+    user_input = st.chat_input("Ask about solar generation, grid balancing, or energy optimization...")
+    
+    if user_input:
+        # Add user message to history
+        st.session_state.chat_history.append({"role": "user", "content": user_input})
+        
+        # Generate response using agent
+        if st.session_state.forecast_df is not None:
+            with st.spinner("Analyzing forecast..."):
+                try:
+                    state = {
+                        "forecast_df": st.session_state.forecast_df,
+                        "user_query": user_input,
+                        "forecast_summary": {},
+                        "risks": [],
+                        "guidelines": "",
+                        "recommendation": ""
+                    }
+                    
+                    result = agent.invoke(state)
+                    assistant_response = result.get("recommendation", "Unable to generate recommendation.")
+                    
+                    st.session_state.chat_history.append({"role": "assistant", "content": assistant_response})
+                    
+                    # Store summary for report generation
+                    st.session_state.forecast_summary = result.get("forecast_summary", st.session_state.forecast_summary)
+                except Exception as e:
+                    error_msg = f"Error generating response: {str(e)}"
+                    st.session_state.chat_history.append({"role": "assistant", "content": error_msg})
+        else:
+            st.session_state.chat_history.append({"role": "assistant", "content": "⚠️ Please upload and forecast data in the Forecasting tab first."})
+        
+        # Cap chat history to prevent unbounded growth
+        if len(st.session_state.chat_history) > MAX_CHAT_HISTORY:
+            st.session_state.chat_history = st.session_state.chat_history[-MAX_CHAT_HISTORY:]
+        
+        st.rerun()
+
