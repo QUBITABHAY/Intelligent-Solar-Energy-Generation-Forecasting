@@ -16,6 +16,8 @@ dependencies = [
 	"langchain-core>=1.2.28",
 	"groq>=1.1.2",
 	"fpdf2",
+	"dotenv>=0.9.9",
+	"torchvision>=0.26.0",
 ]
 
 [tool.uv]
